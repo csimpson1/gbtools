@@ -1,3 +1,13 @@
+  /*********************/
+ /* Database creation */
+/*********************/
+create or replace database MDB_GBDB;
+use MDB_GBDB;
+
+  /******************/
+ /* Table Creation */
+/******************/
+
 create or replace table operation(
 	operation_id int auto_increment primary key,
 	mnemonic char(12) not null,
