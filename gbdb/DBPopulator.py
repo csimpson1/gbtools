@@ -21,7 +21,7 @@ class DBPopulater:
                 user='root',
                 host='localhost',
                 port=3306,
-                database='gameboy_opcodes'
+                database='MDB_GBDB'
                 )
             
         except mariadb.Error as e:
