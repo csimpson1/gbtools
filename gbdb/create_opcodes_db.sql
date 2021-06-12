@@ -2,7 +2,6 @@
  /* Database creation */
 /*********************/
 
-drop database MDB_GBDB;
   
 create or replace database MDB_GBDB;
 use MDB_GBDB;
