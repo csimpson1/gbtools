@@ -13,7 +13,8 @@ class DBPopulater:
         refPage = requests.get(cmdRefUrl)
         #print(refPage.text)
         self.opcodes = json.loads(refPage.text)
-        self.cur = self.connect()
+        
+        self.connect()
         
     def connect(self):
         try:
@@ -30,30 +31,11 @@ class DBPopulater:
         
         cur = self.conn.cursor()
         print("connected!")
-        return cur
+        self.cur = cur
     
-    
-    def get_operations(self):
-        #Get the unique operations from the set of opcodes and populate the operation table
-        
-        uniqueRows = []
-        
-        for type in ['unprefixed', 'cbprefixed']:
-            for code in self.opcodes[type]:
-                #print(self.opcodes[type])
-                opcode = self.opcodes[type][code]
-                row = [opcode['mnemonic'], opcode['flags']['Z'], opcode['flags']['N'], opcode['flags']['H'], opcode['flags']['C']]
-                row = tuple(['' if x == '-' else x for x in row])
-
-                if row not in uniqueRows:
-                    uniqueRows.append(row)
-                    
-        print('finished getting operations') 
-        print('inserting values into operation table')
-        self.cur.executemany("insert into operation (mnemonic, zero_flag, subtract_flag, half_carry_flag, carry_flag) values (?, ?, ?, ?, ?)", uniqueRows)
-        self.conn.commit()
-        print('done inserting')
-        print('--------------------')
+    def clean_up(self):
+        self.cur.close()
+        self.conn.close()
         
         
     def get_operands(self):
@@ -70,17 +52,6 @@ class DBPopulater:
                     else:
                         bytes = 0
                     
-                    # Dealing with special actions on operands    
-                    """
-                    action = ""
-                    
-                    if 'increment' in operand:
-                        action = "+"
-                    
-                    elif 'decrement' in operand:
-                        action = "-"
-                    
-                    """
                     
                     row = (name, bytes)
                 
@@ -96,23 +67,61 @@ class DBPopulater:
         print('--------------------')
     
     
-    def get_opcodes(self):
-        print('getting opcodes')
-        codesToInsert = []
+    def get_flag_actions(self):
+        #Get all the unique combinations of actions and populate the flag_action table
         
-        query = """
-        select operation_id from operation 
-        where
-        mnemonic = ? and
-        zero_flag = ? and
+        uniqueFlagActions = []
+        
+        for type in ['unprefixed', 'cbprefixed']:
+            for code in self.opcodes[type]:
+                flags = self.opcodes[type][code]['flags']
+                flagAction = [flags['Z'], flags['N'], flags['H'], flags['C']]
+                flagAction = tuple(['' if x == '-' else x for x in flagAction])
+                
+                if flagAction not in uniqueFlagActions:
+                    uniqueFlagActions.append(flagAction)
+        
+        print('finished getting flag actions')
+        print('inserting flag actions')
+        self.cur.executemany("insert into flag_action (zero_flag, subtract_flag, half_carry_flag, carry_flag) values (?, ?, ?, ?)", uniqueFlagActions)
+        self.conn.commit()
+        print('done inserting')
+        print('--------------------')    
+        
+    
+    def get_operations(self):
+        #Get the unique operations from the set of opcodes and populate the operation table
+        
+        getFlagsIDQuery = """
+        select flag_action_id from flag_action
+        where 
+        zero_flag = ? and 
         subtract_flag = ? and
         half_carry_flag = ? and
         carry_flag = ?
         """
-
+        uniqueOperations = []
+        
         for type in ['unprefixed', 'cbprefixed']:
             for code in self.opcodes[type]:
-                opcode = self.opcodes[type][code]
+                                    
+                flags = self.opcodes[type][code]['flags']
+                currentFlags = [flags['Z'], flags['N'], flags['H'], flags['C']]
+                currentFlags = tuple(['' if x == '-' else x for x in currentFlags])
+                
+                self.cur.execute(getFlagsIDQuery, currentFlags)
+                results = self.cur.fetchall()
+                
+                if len(results) > 1:
+                    print(f"Error when fetching flags for operation {code} {self.opcodes[type][code]['mnemonic']}: multiple flag ids identified")
+                    sys.exit(-1)
+                    
+                elif len(results) == 0:
+                    print(f"Error when fetching flags for operation {code} {self.opcodes[type][code]['mnemonic']}: no flag ids identified")
+                    sys.exit(-1)
+                    
+                else:
+                    flagActionId = results[0][0]
                 
                 if type == 'cbprefixed':
                     name = code[0:2] + "CB" + code[2:]
@@ -121,53 +130,57 @@ class DBPopulater:
                 
                 bytes = self.opcodes[type][code]['bytes']
                 cycles = self.opcodes[type][code]['cycles'][0]
-
+                mnemonic = self.opcodes[type][code]['mnemonic']
                 
                 try:
                     conditionalCycles = self.opcodes[type][code]['cycles'][1]
                 
                 except IndexError as e:
                     conditionalCycles = None
-                    
-                #Find the operation id
-                # The linkage needs to be performed based on the flags. Different operations have different 
-                # flag actions
                 
-                identifier = [opcode['mnemonic'], opcode['flags']['Z'], opcode['flags']['N'], opcode['flags']['H'], opcode['flags']['C']]
-                identifier = tuple(['' if x == '-' else x for x in identifier])
+                operation = (name, mnemonic, bytes, cycles, conditionalCycles, flagActionId)
                 
-                self.cur.execute(query, identifier)
-                results = self.cur.fetchall()
+                if operation not in uniqueOperations:
+                    uniqueOperations.append(operation)
                 
-                operationId = None
-                if len(results) > 1:
-                    print(f"Error when finding identifier for {name} {opcode['mnemonic']}. Multiple operation ids identified.")
-                    sys.exit(-1)
                 
-                elif len(results) == 0:
-                    print(f"Error when finding identifier for {name} {opcode['mnemonic']}. No Matching operation found")
-                else:
-                        operationId = results[0][0]
-                
-
-                values = (name, operationId, bytes, cycles, conditionalCycles)
-                codesToInsert.append(values)
-        
-        print('done getting opcodes')
-        #DEBUG
-        print('inserting opcodes into opcode table')
-        self.cur.executemany("insert into opcode (code, operation_id, bytes, cycles, conditional_cycles) values (?,?,?,?,?)", codesToInsert)
+        print('finished getting operations')
+        print('inserting flag actions')
+        self.cur.executemany("insert into operation (code, mnemonic, bytes, cycles, conditional_cycles, flag_action_id) values (?, ?, ?, ?, ?, ?)", uniqueOperations)
         self.conn.commit()
         print('done inserting')
-        print('--------------------')
+        print('--------------------')  
+                
+                
+                    
+        print('finished getting operations') 
+        print('inserting values into operation table')
+        #self.cur.executemany("insert into operation (mnemonic, zero_flag, subtract_flag, half_carry_flag, carry_flag) values (?, ?, ?, ?, ?)", uniqueRows)
+        #self.conn.commit()
+        print('done inserting')
+        print('--------------------')    
+    
+    def get_operand_actions(self):
+        #Insert the values of special actions that can be taken on an operand post execution, like increment and decrement.
+        #These are the only two values in this table, and I don't expect the GB CPU to change any time soon, so just hardcoding these
         
+        operandActions = [
+            ('+', "Increment operand after instruction executes"),
+            ('-', "Decrement operand after instruction executes")
+            ]
+        
+        print('done getting operand actions')
+        print('inserting into operand_action table')
+        self.cur.executemany('insert into operand_action (operand_action_symbol, operand_action_desc) values (?, ?)', operandActions)
+        self.conn.commit()
+        print('done inserting')
         
     def get_instructions(self):
         print('getting instructions')
         instructionsToInsert = []
         
-        opcodeQuery = """
-        select opcode_id from opcode
+        operationQuery = """
+        select operation_id from operation
         where
         code=?
         """
@@ -176,6 +189,20 @@ class DBPopulater:
         select operand_id from operand
         where operand_name=?
         """
+        
+        operandActionQuery = """
+        select operand_action_id, operand_action_symbol from operand_action
+        """
+        
+        self.cur.execute(operandActionQuery)
+        results = self.cur.fetchall()
+        actionMapping = {}
+        
+        for action in results:
+            if action[1] == '+':
+                actionMapping['increment'] = action[0]
+            elif action[1] == '-':
+                actionMapping['decrement'] = action[0]
         
         for type in ['unprefixed', 'cbprefixed']:
     
@@ -192,21 +219,21 @@ class DBPopulater:
                 else:
                      codeToSelect = code
                 
-                self.cur.execute(opcodeQuery, (str(codeToSelect),))
+                self.cur.execute(operationQuery, (str(codeToSelect),))
                 results = self.cur.fetchall()
                 if len(results) > 1:
-                    print(f"Error when finding identifier for {code}. Multiple IDs {opcodeId}, {test} were found")
+                    print(f"Error when finding identifier for {code}. Multiple IDs were found")
                     sys.exit(-1)
                 elif len(results) == 0:
                     opcode = None
                     print(f"Error when finding identifier for {code}. No IDs found")
                     sys.exit(-1)
                 else:
-                    opcodeId = results[0][0]
+                    operationId = results[0][0]
                 
                 
                 if not self.opcodes[type][code]['operands']:
-                    instructionsToInsert.append((opcodeId, None, None, None, None))
+                    instructionsToInsert.append((operationId, None, None, None, None))
                     
                 else:
                     operandCounter = 1
@@ -235,19 +262,21 @@ class DBPopulater:
                             action = None
                             
                             if 'increment' in operand:
-                                action = '+'
+                                action = actionMapping['increment']
                             
                             elif 'decrement' in operand:
-                                action = '-'
+                                action = actionMapping['decrement']
                                 
                             
                             
-                        instructionsToInsert.append((opcodeId, operandId, operandCounter, immediate, action))
+                        instructionsToInsert.append((operationId, operandId, operandCounter, immediate, action))
                         operandCounter += 1    
-                
+        #for line in instructionsToInsert:
+        #    print(line)        
+            
         print('done getting instruction linking')
         print('inserting into instruction table')
-        self.cur.executemany('insert into instruction (opcode_id, operand_id, op_order, op_immediate, op_action) values (?, ?, ?, ?, ?)', instructionsToInsert)
+        self.cur.executemany('insert into instruction (operation_id, operand_id, op_order, op_immediate, operand_action_id) values (?, ?, ?, ?, ?)', instructionsToInsert)
         self.conn.commit()
         print('done inserting')
                         
@@ -263,9 +292,11 @@ class DBPopulater:
 if __name__ == '__main__':
     codes = DBPopulater()
 
-    codes.get_operations()
     codes.get_operands()
-    codes.get_opcodes()
+    codes.get_flag_actions()
+    codes.get_operations()
+    codes.get_operand_actions()
     codes.get_instructions()
+    codes.clean_up()
     
     
