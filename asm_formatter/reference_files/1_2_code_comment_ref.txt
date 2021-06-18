@@ -1,0 +1,2 @@
+cp a, 1                     ; Check if something was turned on
+jr nz, .UpdateBookStatusEnd ; Nothing changed, no need to update any status

@@ -1,0 +1,10 @@
+	cp a, $20                              ; Is the pointer on the first book?
+	jr nz, .UpdateBook2Status              ; If not, check the second
+
+
+	;--------------------------------;
+	; this comment breaks up the code;
+	;--------------------------------;
+
+	ld a, c                                ; Get the return code of make_line_blink to see if something had broken
+	jr z, .UpdateBookSeventeenStatusToRead ; Update the status to read

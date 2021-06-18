@@ -1,0 +1,2 @@
+cp a, $20 ; Is the pointer on the first book?
+jr nz, .UpdateBook2Status ; If not, check the second
