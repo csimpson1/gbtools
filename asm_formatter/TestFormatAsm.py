@@ -115,39 +115,62 @@ class TestFormatMethods(unittest.TestCase):
         inp = '1_5_code_comment.txt'
         self.run_single_file_case(inp)
     
-    def test_format_in_place(self):
+    def test_block_comment(self):
         """
-        Test formatting a document in place. We want to be able to run multiple tests, so create a copy of 
-        the file to be formatted first.
-        """
-        pass
-    
-    def test_multiple_format_in_place(self):
-        """
-        Test formating multiple documents in place. Want to be able to run multiple tests, so create
-        copies of the files to be formatted first
-        """
-        pass
-    
-    def test_multiple_format(self):
-        """
-        Test formatting multiple documents in one pass
-        """
-        pass
-    
-    def test_multiple_format_combined(self):
-        """
-        Test formatting multiple documents, some in place and some not, in a single pass
+        Tests the formatting of block comments
+        
+        Input: Two lines with no code that contain only comments
+        Output: The same two lines of text, but now in a block comment
         """
         
-        pass
+        inp = '2_1_block_comment.txt'
+        self.run_single_file_case(inp)
         
-    def test_global_indent(self):
+    def test_two_block_comments(self):
+        
         """
-        Test the global indent feature
+        Tests the formatting of multiple block comments, and the ability of the formatter
+        to separate them
+        
+        Input: Two sets of comments, separated by a linebreak
+        Output: Two properly formatted block comments
         """
         
-        pass
+        inp = '2_2_block_comment.txt'
+        self.run_single_file_case(inp)
+        
+    def test_block_comment_whitespace_signature(self):
+        """
+        Tests the formating of multiple block comments when separated by different types of whitespace
+        
+        Input: Three sets of comments, each with a different amount of leading whitespace
+        Output: Three properly formatted block comments
+        """
+        
+        inp = '2_3_block_comment.txt'
+        self.run_single_file_case(inp)
+        
+    def test_indented_block_comment(self):
+        """
+        Tests the formatting of a block comment that is already indented.
+        Input: Some indented comment lines
+        Output: A properly formatted block comment, that is also indented
+        """
+        
+        inp = '2_4_block_comment.txt'
+        self.run_single_file_case(inp)
+        
+    def test_already_formatted_block_comment(self):
+        """
+        Tests the formatting of an already formatted block comment
+        
+        Input: A formatted block comment
+        Output: The same file
+        """
+        
+        inp = '2_5_block_comment.txt'
+        self.run_single_file_case(inp)
+        
 
 if __name__ == '__main__':
     unittest.main()

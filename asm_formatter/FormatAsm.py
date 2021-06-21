@@ -47,25 +47,24 @@ class AsmFormatter:
 
     def format_files(self):
         
-        #Argparser will store multiple arguments in a list, but a single argument as itself, not a list with a single element
-        if type(self.input) is list:
-            for i, inputFile in enumerate(self.input):
-                
-                try:
-                    output = self.output[i]
-                    
-                except IndexError as e:
-                    output = None
-        
-                self.format_asm(inputFile, output)
-                
-        else:
-            inputFile = self.input
-            output = None
-            if self.output:
-                output = self.output  
+
+        for i, inputFile in enumerate(self.input):
             
+            try:
+                output = self.output[i]
+                
+            except IndexError as e:
+                output = None
+    
             self.format_asm(inputFile, output)
+            
+            #Make sure that we start with a clean slate, otherwise the formatter can get messed up
+            self.globalLineLen = 0
+            self.commentLines  = {}
+            self.commentGroups = {}
+            self.codeLines     = {}
+            self.codeGroups    = {}
+            
         
     def format_asm(self, inputFile, output):
         """
@@ -122,8 +121,18 @@ class AsmFormatter:
                         group = self.commentGroups[idx]
                         groupLine = line
                         whiteSpace = line[:line.find(';'):]
-                        #Subtract 2 from the maxlength because one character is already a semicolon, one is a newline
-                        borderString = whiteSpace + ';' + '-' * (group.maxLen - 2 - len(whiteSpace)) + ';\n'
+                        
+                        """
+                        Check to see if this line contains a newline. If not (such as if the comment is at the end of the file),
+                        then we need to set the offset differently
+                        """
+                        newLine = line.find('\n')
+                        newLineOffset = 1
+                        if newLine == -1:
+                            newLineOffset = 0
+
+                        #Subtract 1-newLineOffset from the maxlength because one character is already a semicolon, one might be a newline
+                        borderString = whiteSpace + ';' + '-' * (group.maxLen - 1 - newLineOffset - len(whiteSpace)) + ';\n'
                         
                         if not group.hasTopBorder:
                             o.write(borderString)
@@ -190,7 +199,8 @@ class AsmFormatter:
                                 except StopIteration as e:
                                     
                                     #get rid of noeol warnings in vi
-                                    o.write('\n')
+                                    if not self.check_for_final_newline(inputFile):
+                                        o.write('\n')
                                     
                                     f.close()
                                     o.close()
@@ -202,12 +212,29 @@ class AsmFormatter:
                             
 
                 #get rid of noeol warnings in vi
-                o.write('\n')
+                if not self.check_for_final_newline(inputFile):
+                    o.write('\n')
         
         if not self.output:
             self.rename_and_remove_tempfile(outputFile)
             
         return
+    
+    def check_for_final_newline(self, inputFile):
+        """
+        Check if a file has a final newline, and return the result
+        """
+        with open(inputFile, 'r') as f:
+            lines = f.readlines()
+            finalLine = lines[-1]
+            
+            newLine = finalLine.find('\n')
+            
+            if newLine == -1:
+                return True
+            else:
+                return False
+            
     
     def rename_and_remove_tempfile(self, tf):
         path = os.path.abspath(self.input)
@@ -433,6 +460,11 @@ class AsmFormatter:
     def _get_candidate_code_groups(self):
         
         indices = list(self.codeLines.keys())
+        
+        #There might not be any code groups, in which case we can just skip this
+        if not indices:
+            return
+        
         indices.sort()
         
         startIdx = indices[0]

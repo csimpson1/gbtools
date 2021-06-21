@@ -1,0 +1,5 @@
+	;This block comment shows
+	;That if lines are at the
+	;same indent level, then
+	;they will still be in one
+	;block

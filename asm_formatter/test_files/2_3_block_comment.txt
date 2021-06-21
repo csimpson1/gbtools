@@ -1,0 +1,3 @@
+;these three lines
+ ;should be formatted
+  ;as separate block comments
