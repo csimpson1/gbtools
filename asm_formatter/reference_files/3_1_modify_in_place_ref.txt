@@ -1,0 +1,10 @@
+ld a, b                   ; Get the return value and move into a
+jp nz, .ErrorWhenExecuting; Nonzero code indicates a problem when processing, so jump to the exception case
+
+;----------------------------------------------------------------------;
+;If the code is zero, then we can continue with processing.            ;
+;Store the current state of the registers, and then start decompression;
+;----------------------------------------------------------------------;
+
+push bc
+push de

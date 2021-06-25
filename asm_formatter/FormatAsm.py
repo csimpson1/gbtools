@@ -1,6 +1,8 @@
 import argparse
 from copy import deepcopy
 import os
+#psutil is useful for debugging file issues
+#import psutil
 import re
 from shutil import move
 import sys
@@ -29,6 +31,9 @@ class AsmFormatter:
     def __init__(self, files, outputs=None, globalIndent = False):
         self.input = files
         self.output = outputs
+        self.currentInputFile = None
+        self.currentOutputFile = None
+        
         self.globalIndent = globalIndent
         
         self.codeNoComment = re.compile("^((?!;).)*$")         # Match if the line does not contain ; 
@@ -50,13 +55,14 @@ class AsmFormatter:
 
         for i, inputFile in enumerate(self.input):
             
-            try:
-                output = self.output[i]
+            self.currentInputFile = inputFile
+            if self.output:
+                self.currentOutputFile = self.output[i]
                 
-            except IndexError as e:
-                output = None
+            else:
+                self.currentOutputFile = None
     
-            self.format_asm(inputFile, output)
+            self.format_asm(self.currentInputFile, self.currentOutputFile)
             
             #Make sure that we start with a clean slate, otherwise the formatter can get messed up
             self.globalLineLen = 0
@@ -64,6 +70,8 @@ class AsmFormatter:
             self.commentGroups = {}
             self.codeLines     = {}
             self.codeGroups    = {}
+            self.currentInputFile = None
+            self.currentOutputFile = None
             
         
     def format_asm(self, inputFile, output):
@@ -86,26 +94,20 @@ class AsmFormatter:
         
         """
         
-        #proc = psutil.Process()
-        
         if output:
             outputFile = output
             
         else:
-            inputPath = os.path.abspath(os.path.dirname(inputFile))
-
-            
+            inputPath = os.path.abspath(os.path.dirname(inputFile))            
             tmpFilePackage = tempfile.mkstemp(dir=inputPath)
-            outputFile = tmpFilePackage[1]
-            
-        
+            outputFile = tmpFilePackage[1]         
 
         
         self._find_features(inputFile)
         self._get_candidate_comment_groups()
         self._get_candidate_code_groups()
-
         
+  
         with open(inputFile, 'r') as f:
             with open(outputFile, 'w') as o:
                 
@@ -161,7 +163,7 @@ class AsmFormatter:
     
                                     
                                     if not output:
-                                        self.rename_and_remove_tempfile(outputFile)
+                                        self.rename_and_remove_tempfile(tmpFilePackage)
                                     
                                     return
                                 
@@ -206,7 +208,7 @@ class AsmFormatter:
                                     o.close()
             
                                     if not output:
-                                        self.rename_and_remove_tempfile(outputFile)
+                                        self.rename_and_remove_tempfile(tmpFilePackage)
                                         return 
                                     
                             
@@ -214,9 +216,12 @@ class AsmFormatter:
                 #get rid of noeol warnings in vi
                 if not self.check_for_final_newline(inputFile):
                     o.write('\n')
+                else:
+                    pass
+        
         
         if not self.output:
-            self.rename_and_remove_tempfile(outputFile)
+            self.rename_and_remove_tempfile(tmpFilePackage)
             
         return
     
@@ -237,8 +242,12 @@ class AsmFormatter:
             
     
     def rename_and_remove_tempfile(self, tf):
-        path = os.path.abspath(self.input)
-        move(os.path.abspath(tf), path)
+        
+        #tf is tuple returned by the tempfile mksftemp function.
+        #First index is a file descriptor, second is the filename
+        os.close(tf[0])
+        path = os.path.abspath(self.currentInputFile)
+        move(os.path.abspath(tf[1]), path)
         
     
     def pad_line_with_spaces(self, line, indent):

@@ -1,6 +1,7 @@
 import argparse
 import filecmp
 import os
+import shutil
 import unittest
 
 import FormatAsm
@@ -170,6 +171,35 @@ class TestFormatMethods(unittest.TestCase):
         
         inp = '2_5_block_comment.txt'
         self.run_single_file_case(inp)
+        
+    def test_fmt_in_place(self):
+        """
+        Tests the formatting of a document in place. 
+        
+        Input: A file containing a mix of code and comments
+        Output: The same file, modified and formatted properly
+        
+        """
+        
+        inp = '3_1_modify_in_place.txt'
+        testFilePath = os.path.join(os.path.dirname(__file__), 'test_files')
+        inpFile = os.path.join(testFilePath, inp)
+        modInPlaceFile = os.path.join(testFilePath, '3_1_modify_in_place_work.txt')
+        refFile = os.path.join(os.path.dirname(__file__), 'reference_files', inp[:-4] + '_ref' + inp[-4:])
+        
+        shutil.copy2(inpFile, modInPlaceFile)
+        
+        args = FormatAsm.parse_args([modInPlaceFile])
+
+        self.formatter = FormatAsm.AsmFormatter(args.input, args.output, args.global_indent)
+        self.formatter.format_files()
+        
+        self.compare_and_track_files(modInPlaceFile, refFile)
+        
+        
+        
+        
+        
         
 
 if __name__ == '__main__':
