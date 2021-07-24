@@ -4,7 +4,7 @@ import os
 import shutil
 import unittest
 
-import FormatAsm
+import asmfmt
 
 class TestFormatMethods(unittest.TestCase):
     
@@ -52,11 +52,11 @@ class TestFormatMethods(unittest.TestCase):
         inputFile, outputFile, refFile = self.get_output_names(fName)
         
         if globalIndent:
-            args = FormatAsm.parse_args([inputFile, '-o', outputFile, '-g'])
+            args = asmfmt.parse_args([inputFile, '-o', outputFile, '-g'])
         else:
-            args = FormatAsm.parse_args([inputFile, '-o', outputFile])
+            args = asmfmt.parse_args([inputFile, '-o', outputFile])
         
-        self.formatter = FormatAsm.AsmFormatter(args.input, args.output, args.global_indent)
+        self.formatter = asmfmt.AsmFormatter(args.input, args.output, args.global_indent)
         self.formatter.format_files()
         
         self.compare_and_track_files(outputFile, refFile)
@@ -189,9 +189,9 @@ class TestFormatMethods(unittest.TestCase):
         
         shutil.copy2(inpFile, modInPlaceFile)
         
-        args = FormatAsm.parse_args([modInPlaceFile])
+        args = asmfmt.parse_args([modInPlaceFile])
 
-        self.formatter = FormatAsm.AsmFormatter(args.input, args.output, args.global_indent)
+        self.formatter = asmfmt.AsmFormatter(args.input, args.output, args.global_indent)
         self.formatter.format_files()
         
         self.compare_and_track_files(modInPlaceFile, refFile)
